@@ -1,47 +1,83 @@
+from banco import criarBanco
+
 from sistema import iniciarSistema
+from sistema import limparTela
 from sistema import mostrarAjuda
 from sistema import mostrarSobre
-from sistema import limparTela
 from sistema import desligarSistema
 from sistema import programaIndisponivel
 
-from banco import criarBanco
-
 from programas.biblioteca import adicionarMusica
 from programas.biblioteca import abrirBiblioteca
+from programas.player import tocarMusica
 
 
 def executarComando(comando):
-    if comando == "help":
+    comando = comando.strip().lower()
+
+    if comando == "":
+        return True
+
+    elif comando == "help":
         mostrarAjuda()
 
-    elif comando == "clear":
-        limparTela()
-
-    elif comando == "about":
-        mostrarSobre()
-
-    elif comando == "music":
-        programaIndisponivel("MUSIC PLAYER")
-
-    elif comando == "library":
+    elif comando == "library" or comando == "ls":
         abrirBiblioteca()
 
     elif comando == "add":
         adicionarMusica()
 
+    elif comando == "play":
+        print()
+        print("INFORME O ID DA MUSICA.")
+        print("EXEMPLO: play 1")
+        print()
+
+    elif comando.startswith("play "):
+        partes = comando.split()
+
+        if len(partes) != 2:
+            print()
+            print("USO CORRETO: play ID")
+            print("EXEMPLO: play 1")
+            print()
+            return True
+
+        if not partes[1].isdigit():
+            print()
+            print("O ID DA MUSICA DEVE SER UM NUMERO.")
+            print("EXEMPLO: play 1")
+            print()
+            return True
+
+        idMusica = int(partes[1])
+
+        tocarMusica(idMusica)
+
+    elif comando == "music":
+        print()
+        print("USE O COMANDO PLAY SEGUIDO DO ID DA MUSICA.")
+        print("EXEMPLO: play 1")
+        print()
+
     elif comando == "search":
-        programaIndisponivel("PESQUISA DE MUSICA")
+        programaIndisponivel("PESQUISAR MUSICA")
 
     elif comando == "remove":
         programaIndisponivel("REMOVER MUSICA")
 
-    elif comando == "shutdown":
+    elif comando == "scan":
+        programaIndisponivel("ESCANEAR BIBLIOTECA")
+
+    elif comando == "clear" or comando == "cls":
+        limparTela()
+
+    elif comando == "about":
+        mostrarSobre()
+
+    elif comando == "shutdown" or comando == "exit":
         desligarSistema()
         return False
-
-    elif comando == "":
-        pass
 
     else:
         print()
@@ -53,18 +89,30 @@ def executarComando(comando):
 
 
 def abrirTerminal():
-    criarBanco()
-    iniciarSistema()
-
     sistemaLigado = True
 
     while sistemaLigado:
-        comando = input("music@nova > ")
+        try:
+            comando = input("music@nova > ")
+            sistemaLigado = executarComando(comando)
 
-        comando = comando.lower()
-        comando = comando.strip()
+        except KeyboardInterrupt:
+            print()
+            print()
+            print("USE SHUTDOWN PARA DESLIGAR O SISTEMA.")
+            print()
 
-        sistemaLigado = executarComando(comando)
+        except EOFError:
+            print()
+            desligarSistema()
+            sistemaLigado = False
 
 
-abrirTerminal()
+def iniciarPrograma():
+    criarBanco()
+    iniciarSistema()
+    abrirTerminal()
+
+
+if __name__ == "__main__":
+    iniciarPrograma()
