@@ -1,5 +1,10 @@
 import os
+
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+
 import time
+from pathlib import Path
+
 import pygame
 
 from banco import buscarMusica
@@ -7,16 +12,32 @@ from sistema import limparTela
 from sistema import mostrarCabecalho
 
 
-pygame.mixer.init()
+PASTA_PROJETO = Path(__file__).resolve().parent.parent
 
 
 def formatarDuracao(segundos):
-    segundos = int(segundos)
+    try:
+        segundos = int(segundos)
+
+    except (TypeError, ValueError):
+        segundos = 0
+
+    if segundos < 0:
+        segundos = 0
 
     minutos = segundos // 60
-    segundos = segundos % 60
+    segundosRestantes = segundos % 60
 
-    return f"{minutos:02}:{segundos:02}"
+    return f"{minutos:02}:{segundosRestantes:02}"
+
+
+def criarCaminhoCompleto(caminho):
+    caminhoRecebido = Path(caminho)
+
+    if caminhoRecebido.is_absolute():
+        return caminhoRecebido
+
+    return PASTA_PROJETO / caminhoRecebido
 
 
 def criarBarra(atual, total):
@@ -24,8 +45,14 @@ def criarBarra(atual, total):
 
     if total <= 0:
         preenchido = 0
+
     else:
-        preenchido = int((atual / total) * tamanho)
+        preenchido = int(
+            (atual / total) * tamanho
+        )
+
+    if preenchido < 0:
+        preenchido = 0
 
     if preenchido > tamanho:
         preenchido = tamanho
@@ -36,7 +63,11 @@ def criarBarra(atual, total):
     return barra
 
 
-def mostrarTela(musica, tempoAtual, pausada):
+def mostrarTela(
+    musica,
+    tempoAtual,
+    pausada
+):
     titulo = musica[1]
     artista = musica[2]
     album = musica[3]
@@ -53,6 +84,9 @@ def mostrarTela(musica, tempoAtual, pausada):
     if album:
         print("ALBUM   :", album)
 
+    else:
+        print("ALBUM   : NAO INFORMADO")
+
     print()
     print(criarBarra(tempoAtual, duracao))
     print()
@@ -65,14 +99,31 @@ def mostrarTela(musica, tempoAtual, pausada):
 
     if pausada:
         print("STATUS  : PAUSADO")
+
     else:
         print("STATUS  : TOCANDO")
 
     print()
-    print("[P] PAUSAR/CONTINUAR")
+    print("[P] PAUSAR OU CONTINUAR")
     print("[S] PARAR")
     print("[Q] SAIR DO PLAYER")
     print()
+
+
+def iniciarAudio():
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+
+        return True
+
+    except pygame.error as erro:
+        print()
+        print("NAO FOI POSSIVEL INICIAR O AUDIO.")
+        print("ERRO:", erro)
+        print()
+
+        return False
 
 
 def tocarMusica(idMusica):
@@ -82,27 +133,44 @@ def tocarMusica(idMusica):
         print()
         print("MUSICA NAO ENCONTRADA.")
         print()
+
         return
 
-    caminho = musica[4]
+    caminhoSalvo = musica[4]
+    caminhoCompleto = criarCaminhoCompleto(
+        caminhoSalvo
+    )
+
     duracao = musica[5]
 
-    if not os.path.isfile(caminho):
+    if not caminhoCompleto.is_file():
         print()
         print("ARQUIVO DE AUDIO NAO ENCONTRADO:")
-        print(caminho)
+        print(caminhoCompleto)
         print()
+        print("REMOVA O REGISTRO ANTIGO E")
+        print("CADASTRE A MUSICA NOVAMENTE.")
+        print()
+
+        return
+
+    if not iniciarAudio():
         return
 
     try:
-        pygame.mixer.music.load(caminho)
+        pygame.mixer.music.load(
+            str(caminhoCompleto)
+        )
+
         pygame.mixer.music.play()
 
     except pygame.error as erro:
         print()
-        print("NAO FOI POSSIVEL REPRODUZIR A MUSICA.")
+        print("NAO FOI POSSIVEL REPRODUZIR")
+        print("A MUSICA.")
         print("ERRO:", erro)
         print()
+
         return
 
     inicio = time.time()
@@ -112,9 +180,18 @@ def tocarMusica(idMusica):
 
     while True:
         if pausada:
-            tempoAtual = inicioPausa - inicio - tempoPausado
+            tempoAtual = (
+                inicioPausa
+                - inicio
+                - tempoPausado
+            )
+
         else:
-            tempoAtual = time.time() - inicio - tempoPausado
+            tempoAtual = (
+                time.time()
+                - inicio
+                - tempoPausado
+            )
 
         if tempoAtual < 0:
             tempoAtual = 0
@@ -122,20 +199,36 @@ def tocarMusica(idMusica):
         if duracao > 0 and tempoAtual > duracao:
             tempoAtual = duracao
 
-        mostrarTela(musica, tempoAtual, pausada)
+        mostrarTela(
+            musica,
+            tempoAtual,
+            pausada
+        )
 
-        if not pygame.mixer.music.get_busy() and not pausada:
+        if (
+            not pygame.mixer.music.get_busy()
+            and not pausada
+        ):
             break
 
-        comando = input("PLAYER > ").strip().lower()
+        comando = input(
+            "PLAYER > "
+        ).strip().lower()
 
         if comando == "p":
             if pausada:
                 pygame.mixer.music.unpause()
-                tempoPausado += time.time() - inicioPausa
+
+                tempoPausado += (
+                    time.time()
+                    - inicioPausa
+                )
+
                 pausada = False
+
             else:
                 pygame.mixer.music.pause()
+
                 inicioPausa = time.time()
                 pausada = True
 
@@ -146,6 +239,14 @@ def tocarMusica(idMusica):
         elif comando == "q":
             pygame.mixer.music.stop()
             break
+
+        elif comando == "":
+            continue
+
+        else:
+            print()
+            print("COMANDO DO PLAYER INVALIDO.")
+            time.sleep(1)
 
     print()
     print("PLAYER ENCERRADO.")

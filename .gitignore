@@ -1,5 +1,16 @@
 __pycache__/
 *.pyc
+*.pyo
+
 dados/*.db
 backup/
+
 .vscode/
+.idea/
+
+musicas/*
+!musicas/.gitkeep
+
+.env
+venv/
+.venv/

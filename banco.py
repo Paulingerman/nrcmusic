@@ -1,17 +1,14 @@
-import os
 import sqlite3
+from pathlib import Path
 
 
-PASTA_DADOS = "dados"
-CAMINHO_BANCO = os.path.join(
-    PASTA_DADOS,
-    "musicas.db"
-)
+PASTA_PROJETO = Path(__file__).resolve().parent
+PASTA_DADOS = PASTA_PROJETO / "dados"
+CAMINHO_BANCO = PASTA_DADOS / "musicas.db"
 
 
 def conectarBanco():
-    if not os.path.isdir(PASTA_DADOS):
-        os.makedirs(PASTA_DADOS)
+    PASTA_DADOS.mkdir(parents=True, exist_ok=True)
 
     conexao = sqlite3.connect(CAMINHO_BANCO)
 
@@ -29,11 +26,26 @@ def criarBanco():
             titulo TEXT NOT NULL,
             artista TEXT NOT NULL,
             album TEXT,
-            caminho TEXT NOT NULL UNIQUE,
+            caminho TEXT NOT NULL,
             duracao INTEGER NOT NULL DEFAULT 0
         )
         """
     )
+
+    try:
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            indiceCaminhoMusica
+            ON musicas(caminho)
+            """
+        )
+
+    except sqlite3.IntegrityError:
+        print()
+        print("AVISO: EXISTEM CAMINHOS DUPLICADOS NO BANCO.")
+        print("O INDICE DE CAMINHO NAO FOI CRIADO.")
+        print()
 
     conexao.commit()
     conexao.close()
@@ -73,11 +85,11 @@ def cadastrarMusica(
         conexao.commit()
 
     except sqlite3.IntegrityError:
-        conexao.close()
-
         print()
         print("ESSA MUSICA JA ESTA CADASTRADA.")
         print()
+
+        conexao.close()
 
         return False
 
@@ -94,7 +106,7 @@ def listarMusicas():
         """
         SELECT id, titulo, artista, album, caminho, duracao
         FROM musicas
-        ORDER BY titulo
+        ORDER BY artista, titulo
         """
     )
 
@@ -143,6 +155,35 @@ def atualizarDuracao(idMusica, duracao):
 
     conexao.commit()
     conexao.close()
+
+
+def atualizarCaminho(idMusica, caminho):
+    conexao = conectarBanco()
+    cursor = conexao.cursor()
+
+    try:
+        cursor.execute(
+            """
+            UPDATE musicas
+            SET caminho = ?
+            WHERE id = ?
+            """,
+            (
+                caminho,
+                idMusica
+            )
+        )
+
+        conexao.commit()
+
+    except sqlite3.IntegrityError:
+        conexao.close()
+
+        return False
+
+    conexao.close()
+
+    return True
 
 
 def removerMusica(idMusica):

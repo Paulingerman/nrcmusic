@@ -1,19 +1,31 @@
-import os
 import re
 import time
 import subprocess
+from pathlib import Path
 
+from banco import atualizarDuracao
 from banco import cadastrarMusica
 from banco import listarMusicas
 
 
-PASTA_MUSICAS = "musicas"
+PASTA_PROJETO = Path(__file__).resolve().parent.parent
+PASTA_MUSICAS = PASTA_PROJETO / "musicas"
+EXTENSOES_AUDIO = [
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".flac"
+]
 
 
 def formatarDuracao(segundos):
     try:
         segundos = int(segundos)
+
     except (TypeError, ValueError):
+        segundos = 0
+
+    if segundos < 0:
         segundos = 0
 
     minutos = segundos // 60
@@ -32,7 +44,6 @@ def mostrarCarregamento():
     for posicao in range(tamanho + 1):
         preenchido = "█" * posicao
         vazio = "░" * (tamanho - posicao)
-
         porcentagem = int((posicao / tamanho) * 100)
 
         print(
@@ -48,26 +59,21 @@ def mostrarCarregamento():
 
 
 def buscarArquivos():
-    if not os.path.isdir(PASTA_MUSICAS):
-        os.makedirs(PASTA_MUSICAS)
+    PASTA_MUSICAS.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     arquivos = []
 
-    for nomeArquivo in os.listdir(PASTA_MUSICAS):
-        caminhoCompleto = os.path.join(
-            PASTA_MUSICAS,
-            nomeArquivo
-        )
-
-        if not os.path.isfile(caminhoCompleto):
+    for caminho in PASTA_MUSICAS.iterdir():
+        if not caminho.is_file():
             continue
 
-        extensao = os.path.splitext(nomeArquivo)[1].lower()
+        if caminho.suffix.lower() in EXTENSOES_AUDIO:
+            arquivos.append(caminho.name)
 
-        if extensao in [".mp3", ".wav", ".ogg", ".flac"]:
-            arquivos.append(nomeArquivo)
-
-    arquivos.sort()
+    arquivos.sort(key=str.lower)
 
     return arquivos
 
@@ -76,7 +82,10 @@ def mostrarArquivos(arquivos):
     print("ARQUIVOS ENCONTRADOS")
     print("-" * 60)
 
-    for numero, arquivo in enumerate(arquivos, start=1):
+    for numero, arquivo in enumerate(
+        arquivos,
+        start=1
+    ):
         print(f"{numero}. {arquivo}")
 
     print("-" * 60)
@@ -86,7 +95,8 @@ def mostrarArquivos(arquivos):
 def escolherArquivo(arquivos):
     while True:
         escolha = input(
-            "ESCOLHA O NUMERO DO ARQUIVO OU 0 PARA CANCELAR: "
+            "ESCOLHA O NUMERO DO ARQUIVO "
+            "OU 0 PARA CANCELAR: "
         ).strip()
 
         if escolha == "0":
@@ -121,6 +131,7 @@ def limparTitulo(titulo):
         r"\(4k\)",
         r"\[official video\]",
         r"\[official audio\]",
+        r"\[official music video\]",
         r"\[lyrics\]",
         r"kissvk\.com",
         r"www\."
@@ -148,16 +159,25 @@ def limparTitulo(titulo):
 
 
 def separarNome(nomeArquivo):
-    nomeSemExtensao = os.path.splitext(nomeArquivo)[0]
+    nomeSemExtensao = Path(nomeArquivo).stem
 
     if " - " in nomeSemExtensao:
-        partes = nomeSemExtensao.split(" - ", 1)
+        partes = nomeSemExtensao.split(
+            " - ",
+            1
+        )
 
     elif "-" in nomeSemExtensao:
-        partes = nomeSemExtensao.split("-", 1)
+        partes = nomeSemExtensao.split(
+            "-",
+            1
+        )
 
     else:
-        return "DESCONHECIDO", limparTitulo(nomeSemExtensao)
+        return (
+            "DESCONHECIDO",
+            limparTitulo(nomeSemExtensao)
+        )
 
     artista = partes[0].strip()
     titulo = limparTitulo(partes[1].strip())
@@ -171,7 +191,24 @@ def separarNome(nomeArquivo):
     return artista, titulo
 
 
+def criarCaminhoRelativo(nomeArquivo):
+    caminho = Path("musicas") / nomeArquivo
+
+    return caminho.as_posix()
+
+
+def criarCaminhoCompleto(caminho):
+    caminhoRecebido = Path(caminho)
+
+    if caminhoRecebido.is_absolute():
+        return caminhoRecebido
+
+    return PASTA_PROJETO / caminhoRecebido
+
+
 def buscarDuracao(caminho):
+    caminhoCompleto = criarCaminhoCompleto(caminho)
+
     try:
         resultado = subprocess.run(
             [
@@ -182,7 +219,7 @@ def buscarDuracao(caminho):
                 "format=duration",
                 "-of",
                 "default=noprint_wrappers=1:nokey=1",
-                caminho
+                str(caminhoCompleto)
             ],
             capture_output=True,
             text=True,
@@ -205,6 +242,8 @@ def buscarDuracao(caminho):
         print()
         print("ERRO: FFPROBE NAO FOI ENCONTRADO.")
         print("INSTALE O FFMPEG PARA LER A DURACAO.")
+        print()
+
         return 0
 
     except subprocess.CalledProcessError as erro:
@@ -216,11 +255,16 @@ def buscarDuracao(caminho):
         if mensagem:
             print(mensagem)
 
+        print()
+
         return 0
 
     except ValueError:
         print()
-        print("A DURACAO RETORNADA PELO FFPROBE E INVALIDA.")
+        print("A DURACAO RETORNADA PELO FFPROBE")
+        print("NAO E VALIDA.")
+        print()
+
         return 0
 
 
@@ -232,11 +276,10 @@ def adicionarMusica():
     if not arquivos:
         print("NENHUM ARQUIVO DE AUDIO FOI ENCONTRADO.")
         print()
-        print(
-            "COLOQUE AS MUSICAS DENTRO DA PASTA:",
-            PASTA_MUSICAS
-        )
+        print("COLOQUE AS MUSICAS DENTRO DA PASTA:")
+        print(PASTA_MUSICAS)
         print()
+
         return
 
     mostrarArquivos(arquivos)
@@ -247,14 +290,12 @@ def adicionarMusica():
         print()
         print("CADASTRO CANCELADO.")
         print()
+
         return
 
-    caminho = os.path.join(
-        PASTA_MUSICAS,
+    caminho = criarCaminhoRelativo(
         arquivoEscolhido
     )
-
-    caminho = os.path.abspath(caminho)
 
     artistaSugerido, tituloSugerido = separarNome(
         arquivoEscolhido
@@ -293,18 +334,23 @@ def adicionarMusica():
 
     if duracao <= 0:
         print()
-        print("NAO FOI POSSIVEL IDENTIFICAR A DURACAO.")
+        print("NAO FOI POSSIVEL IDENTIFICAR")
+        print("A DURACAO DA MUSICA.")
         print("A MUSICA NAO FOI CADASTRADA.")
         print()
+
         return
 
-    cadastrarMusica(
+    cadastrada = cadastrarMusica(
         titulo,
         artista,
         album,
         caminho,
         duracao
     )
+
+    if not cadastrada:
+        return
 
     print()
     print("MUSICA CADASTRADA COM SUCESSO.")
@@ -330,6 +376,7 @@ def abrirBiblioteca():
     if not musicas:
         print("NENHUMA MUSICA CADASTRADA.")
         print()
+
         return
 
     for musica in musicas:
@@ -337,7 +384,12 @@ def abrirBiblioteca():
         titulo = musica[1]
         artista = musica[2]
         album = musica[3]
+        caminho = musica[4]
         duracao = musica[5]
+
+        caminhoCompleto = criarCaminhoCompleto(
+            caminho
+        )
 
         print("ID      :", idMusica)
         print("TITULO  :", titulo)
@@ -345,10 +397,81 @@ def abrirBiblioteca():
 
         if album:
             print("ALBUM   :", album)
+
         else:
             print("ALBUM   : NAO INFORMADO")
 
         print("TEMPO   :", formatarDuracao(duracao))
+
+        if not caminhoCompleto.is_file():
+            print("ARQUIVO : NAO ENCONTRADO")
+
         print("-" * 60)
 
+    print()
+
+
+def atualizarBiblioteca():
+    musicas = listarMusicas()
+
+    print()
+    print("=" * 60)
+    print("                 ATUALIZANDO BIBLIOTECA")
+    print("=" * 60)
+    print()
+
+    if not musicas:
+        print("NENHUMA MUSICA CADASTRADA.")
+        print()
+
+        return
+
+    atualizadas = 0
+    naoEncontradas = 0
+    erros = 0
+
+    for musica in musicas:
+        idMusica = musica[0]
+        titulo = musica[1]
+        caminho = musica[4]
+
+        caminhoCompleto = criarCaminhoCompleto(
+            caminho
+        )
+
+        print(f"ANALISANDO: {titulo}")
+
+        if not caminhoCompleto.is_file():
+            print("RESULTADO : ARQUIVO NAO ENCONTRADO")
+            print()
+
+            naoEncontradas += 1
+            continue
+
+        duracao = buscarDuracao(caminho)
+
+        if duracao <= 0:
+            print("RESULTADO : ERRO AO LER DURACAO")
+            print()
+
+            erros += 1
+            continue
+
+        atualizarDuracao(
+            idMusica,
+            duracao
+        )
+
+        print(
+            "RESULTADO :",
+            formatarDuracao(duracao)
+        )
+        print()
+
+        atualizadas += 1
+
+    print("-" * 60)
+    print("ATUALIZADAS      :", atualizadas)
+    print("NAO ENCONTRADAS :", naoEncontradas)
+    print("ERROS            :", erros)
     print()

@@ -1,14 +1,15 @@
 from banco import criarBanco
 
+from sistema import desligarSistema
 from sistema import iniciarSistema
 from sistema import limparTela
 from sistema import mostrarAjuda
 from sistema import mostrarSobre
-from sistema import desligarSistema
 from sistema import programaIndisponivel
 
 from programas.biblioteca import adicionarMusica
 from programas.biblioteca import abrirBiblioteca
+from programas.biblioteca import atualizarBiblioteca
 from programas.player import tocarMusica
 
 
@@ -18,10 +19,10 @@ def executarComando(comando):
     if comando == "":
         return True
 
-    elif comando == "help":
+    if comando == "help":
         mostrarAjuda()
 
-    elif comando == "library" or comando == "ls":
+    elif comando in ["library", "ls"]:
         abrirBiblioteca()
 
     elif comando == "add":
@@ -41,6 +42,7 @@ def executarComando(comando):
             print("USO CORRETO: play ID")
             print("EXEMPLO: play 1")
             print()
+
             return True
 
         if not partes[1].isdigit():
@@ -48,6 +50,7 @@ def executarComando(comando):
             print("O ID DA MUSICA DEVE SER UM NUMERO.")
             print("EXEMPLO: play 1")
             print()
+
             return True
 
         idMusica = int(partes[1])
@@ -56,32 +59,40 @@ def executarComando(comando):
 
     elif comando == "music":
         print()
-        print("USE O COMANDO PLAY SEGUIDO DO ID DA MUSICA.")
+        print("USE PLAY SEGUIDO DO ID DA MUSICA.")
         print("EXEMPLO: play 1")
         print()
 
+    elif comando == "scan":
+        atualizarBiblioteca()
+
     elif comando == "search":
-        programaIndisponivel("PESQUISAR MUSICA")
+        programaIndisponivel(
+            "PESQUISAR MUSICA"
+        )
 
     elif comando == "remove":
-        programaIndisponivel("REMOVER MUSICA")
+        programaIndisponivel(
+            "REMOVER MUSICA"
+        )
 
-    elif comando == "scan":
-        programaIndisponivel("ESCANEAR BIBLIOTECA")
-
-    elif comando == "clear" or comando == "cls":
+    elif comando in ["clear", "cls"]:
         limparTela()
 
     elif comando == "about":
         mostrarSobre()
 
-    elif comando == "shutdown" or comando == "exit":
+    elif comando in ["shutdown", "exit"]:
         desligarSistema()
+
         return False
 
     else:
         print()
-        print("COMANDO NAO RECONHECIDO:", comando)
+        print(
+            "COMANDO NAO RECONHECIDO:",
+            comando
+        )
         print("DIGITE HELP PARA VER OS COMANDOS.")
         print()
 
@@ -93,17 +104,24 @@ def abrirTerminal():
 
     while sistemaLigado:
         try:
-            comando = input("music@nova > ")
-            sistemaLigado = executarComando(comando)
+            comando = input("music@nrc > ")
+
+            sistemaLigado = executarComando(
+                comando
+            )
 
         except KeyboardInterrupt:
             print()
             print()
-            print("USE SHUTDOWN PARA DESLIGAR O SISTEMA.")
+            print(
+                "USE SHUTDOWN PARA DESLIGAR "
+                "O SISTEMA."
+            )
             print()
 
         except EOFError:
             print()
+
             desligarSistema()
             sistemaLigado = False
 
