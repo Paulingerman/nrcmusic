@@ -2,17 +2,24 @@ import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
+import curses
+import locale
 import time
 from pathlib import Path
 
 import pygame
 
 from banco import buscarMusica
-from sistema import limparTela
-from sistema import mostrarCabecalho
 
+
+locale.setlocale(locale.LC_ALL, "")
 
 PASTA_PROJETO = Path(__file__).resolve().parent.parent
+
+LARGURA_PLAYER = 64
+TAMANHO_BARRA_PROGRESSO = 42
+TAMANHO_BARRA_VOLUME = 20
+INTERVALO_ATUALIZACAO = 0.1
 
 
 def formatarDuracao(segundos):
@@ -22,8 +29,7 @@ def formatarDuracao(segundos):
     except (TypeError, ValueError):
         segundos = 0
 
-    if segundos < 0:
-        segundos = 0
+    segundos = max(0, segundos)
 
     minutos = segundos // 60
     segundosRestantes = segundos % 60
@@ -40,74 +46,55 @@ def criarCaminhoCompleto(caminho):
     return PASTA_PROJETO / caminhoRecebido
 
 
-def criarBarra(atual, total):
-    tamanho = 30
+def limitarTexto(texto, tamanho):
+    texto = str(texto or "")
 
-    if total <= 0:
-        preenchido = 0
+    if len(texto) <= tamanho:
+        return texto
 
-    else:
-        preenchido = int(
-            (atual / total) * tamanho
-        )
-
-    if preenchido < 0:
-        preenchido = 0
-
-    if preenchido > tamanho:
-        preenchido = tamanho
-
-    barra = "█" * preenchido
-    barra += "░" * (tamanho - preenchido)
-
-    return barra
+    return texto[: tamanho - 3] + "..."
 
 
-def mostrarTela(
-    musica,
-    tempoAtual,
-    pausada
-):
-    titulo = musica[1]
-    artista = musica[2]
-    album = musica[3]
-    duracao = musica[5]
-
-    limparTela()
-    mostrarCabecalho("NRC MUSIC PLAYER")
-    print()
-
-    print("♪", titulo)
-    print()
-    print("ARTISTA :", artista)
-
-    if album:
-        print("ALBUM   :", album)
+def criarBarraProgresso(tempoAtual, duracao):
+    if duracao <= 0:
+        progresso = 0
 
     else:
-        print("ALBUM   : NAO INFORMADO")
+        progresso = tempoAtual / duracao
 
-    print()
-    print(criarBarra(tempoAtual, duracao))
-    print()
-    print(
-        formatarDuracao(tempoAtual),
-        "/",
-        formatarDuracao(duracao)
+    progresso = max(0, min(progresso, 1))
+
+    preenchido = int(
+        progresso * TAMANHO_BARRA_PROGRESSO
     )
-    print()
 
-    if pausada:
-        print("STATUS  : PAUSADO")
+    vazio = (
+        TAMANHO_BARRA_PROGRESSO
+        - preenchido
+    )
 
-    else:
-        print("STATUS  : TOCANDO")
+    return (
+        "█" * preenchido
+        + "░" * vazio
+    )
 
-    print()
-    print("[P] PAUSAR OU CONTINUAR")
-    print("[S] PARAR")
-    print("[Q] SAIR DO PLAYER")
-    print()
+
+def criarBarraVolume(volume):
+    volume = max(0, min(volume, 1))
+
+    preenchido = int(
+        volume * TAMANHO_BARRA_VOLUME
+    )
+
+    vazio = (
+        TAMANHO_BARRA_VOLUME
+        - preenchido
+    )
+
+    return (
+        "█" * preenchido
+        + "░" * vazio
+    )
 
 
 def iniciarAudio():
@@ -126,6 +113,372 @@ def iniciarAudio():
         return False
 
 
+def escreverSeguro(
+    tela,
+    linha,
+    coluna,
+    texto,
+    atributo=0
+):
+    alturaTerminal, larguraTerminal = (
+        tela.getmaxyx()
+    )
+
+    if linha < 0 or linha >= alturaTerminal:
+        return
+
+    if coluna < 0 or coluna >= larguraTerminal:
+        return
+
+    espacoDisponivel = (
+        larguraTerminal
+        - coluna
+        - 1
+    )
+
+    if espacoDisponivel <= 0:
+        return
+
+    texto = str(texto)
+    texto = texto[:espacoDisponivel]
+
+    try:
+        tela.addstr(
+            linha,
+            coluna,
+            texto,
+            atributo
+        )
+
+    except curses.error:
+        pass
+
+
+def linhaComBordas(conteudo=""):
+    larguraInterna = LARGURA_PLAYER - 2
+
+    conteudo = limitarTexto(
+        conteudo,
+        larguraInterna
+    )
+
+    return (
+        "║"
+        + conteudo.ljust(larguraInterna)
+        + "║"
+    )
+
+
+def desenharPlayer(
+    tela,
+    musica,
+    tempoAtual,
+    pausada,
+    volume
+):
+    tela.erase()
+
+    alturaTerminal, larguraTerminal = (
+        tela.getmaxyx()
+    )
+
+    alturaPlayer = 25
+
+    if (
+        larguraTerminal < LARGURA_PLAYER
+        or alturaTerminal < alturaPlayer
+    ):
+        escreverSeguro(
+            tela,
+            1,
+            2,
+            "AUMENTE O TAMANHO DO TERMINAL."
+        )
+
+        escreverSeguro(
+            tela,
+            3,
+            2,
+            (
+                f"MINIMO: "
+                f"{LARGURA_PLAYER} COLUNAS "
+                f"X {alturaPlayer} LINHAS"
+            )
+        )
+
+        tela.refresh()
+        return
+
+    colunaInicial = max(
+        0,
+        (
+            larguraTerminal
+            - LARGURA_PLAYER
+        ) // 2
+    )
+
+    linhaInicial = max(
+        0,
+        (
+            alturaTerminal
+            - alturaPlayer
+        ) // 2
+    )
+
+    titulo = limitarTexto(
+        musica[1],
+        47
+    )
+
+    artista = limitarTexto(
+        musica[2],
+        46
+    )
+
+    album = musica[3]
+
+    if album:
+        album = limitarTexto(
+            album,
+            48
+        )
+
+    else:
+        album = "NAO INFORMADO"
+
+    duracao = musica[5]
+
+    barraProgresso = criarBarraProgresso(
+        tempoAtual,
+        duracao
+    )
+
+    barraVolume = criarBarraVolume(
+        volume
+    )
+
+    porcentagemVolume = round(
+        volume * 100
+    )
+
+    if pausada:
+        status = "|| PAUSADO"
+
+    else:
+        status = "> TOCANDO"
+
+    larguraInterna = LARGURA_PLAYER - 2
+
+    linhas = [
+        "╔" + "═" * larguraInterna + "╗",
+        linhaComBordas(
+            "NRC MUSIC PLAYER".center(
+                larguraInterna
+            )
+        ),
+        "╠" + "═" * larguraInterna + "╣",
+        linhaComBordas(),
+        linhaComBordas("  TOCANDO AGORA"),
+        linhaComBordas(),
+        linhaComBordas(
+            f"  TITULO  : {titulo}"
+        ),
+        linhaComBordas(
+            f"  ARTISTA : {artista}"
+        ),
+        linhaComBordas(
+            f"  ALBUM   : {album}"
+        ),
+        linhaComBordas(),
+        linhaComBordas(
+            f"  [{barraProgresso}]"
+        ),
+        linhaComBordas(),
+        linhaComBordas(
+            "  "
+            + formatarDuracao(tempoAtual)
+            + " / "
+            + formatarDuracao(duracao)
+        ),
+        linhaComBordas(
+            f"  STATUS  : {status}"
+        ),
+        linhaComBordas(),
+        linhaComBordas(
+            f"  VOLUME  : [{barraVolume}] "
+            f"{porcentagemVolume:3}%"
+        ),
+        linhaComBordas(),
+        "╠" + "═" * larguraInterna + "╣",
+        linhaComBordas(
+            "  [P] PAUSAR OU CONTINUAR"
+        ),
+        linhaComBordas(
+            "  [+] AUMENTAR VOLUME"
+        ),
+        linhaComBordas(
+            "  [-] DIMINUIR VOLUME"
+        ),
+        linhaComBordas(
+            "  [S] PARAR"
+        ),
+        linhaComBordas(
+            "  [Q] SAIR DO PLAYER"
+        ),
+        "╚" + "═" * larguraInterna + "╝"
+    ]
+
+    for indice, linha in enumerate(linhas):
+        atributo = curses.A_NORMAL
+
+        if indice == 1:
+            atributo = curses.A_BOLD
+
+        escreverSeguro(
+            tela,
+            linhaInicial + indice,
+            colunaInicial,
+            linha,
+            atributo
+        )
+
+    tela.refresh()
+
+
+def calcularTempoAtual(
+    inicioMusica,
+    tempoTotalPausado,
+    inicioPausa,
+    pausada
+):
+    if pausada:
+        instanteAtual = inicioPausa
+
+    else:
+        instanteAtual = time.monotonic()
+
+    tempoAtual = (
+        instanteAtual
+        - inicioMusica
+        - tempoTotalPausado
+    )
+
+    return max(0, tempoAtual)
+
+
+def executarPlayer(
+    tela,
+    musica,
+    volumeInicial
+):
+    curses.curs_set(0)
+
+    tela.nodelay(True)
+    tela.keypad(True)
+
+    try:
+        curses.use_default_colors()
+
+    except curses.error:
+        pass
+
+    volume = volumeInicial
+    pausada = False
+    inicioPausa = None
+    tempoTotalPausado = 0
+    inicioMusica = time.monotonic()
+    playerAberto = True
+
+    duracao = musica[5]
+
+    while playerAberto:
+        tempoAtual = calcularTempoAtual(
+            inicioMusica,
+            tempoTotalPausado,
+            inicioPausa,
+            pausada
+        )
+
+        if duracao > 0:
+            tempoAtual = min(
+                tempoAtual,
+                duracao
+            )
+
+        desenharPlayer(
+            tela,
+            musica,
+            tempoAtual,
+            pausada,
+            volume
+        )
+
+        if (
+            not pausada
+            and not pygame.mixer.music.get_busy()
+        ):
+            break
+
+        tecla = tela.getch()
+
+        if tecla in [
+            ord("p"),
+            ord("P")
+        ]:
+            if pausada:
+                pygame.mixer.music.unpause()
+
+                tempoTotalPausado += (
+                    time.monotonic()
+                    - inicioPausa
+                )
+
+                inicioPausa = None
+                pausada = False
+
+            else:
+                pygame.mixer.music.pause()
+
+                inicioPausa = time.monotonic()
+                pausada = True
+
+        elif tecla in [
+            ord("+"),
+            ord("=")
+        ]:
+            volume = min(
+                1.0,
+                round(volume + 0.1, 1)
+            )
+
+            pygame.mixer.music.set_volume(
+                volume
+            )
+
+        elif tecla == ord("-"):
+            volume = max(
+                0.0,
+                round(volume - 0.1, 1)
+            )
+
+            pygame.mixer.music.set_volume(
+                volume
+            )
+
+        elif tecla in [
+            ord("s"),
+            ord("S"),
+            ord("q"),
+            ord("Q")
+        ]:
+            pygame.mixer.music.stop()
+            playerAberto = False
+
+        time.sleep(
+            INTERVALO_ATUALIZACAO
+        )
+
+
 def tocarMusica(idMusica):
     musica = buscarMusica(idMusica)
 
@@ -137,19 +490,17 @@ def tocarMusica(idMusica):
         return
 
     caminhoSalvo = musica[4]
+
     caminhoCompleto = criarCaminhoCompleto(
         caminhoSalvo
     )
 
-    duracao = musica[5]
-
     if not caminhoCompleto.is_file():
         print()
-        print("ARQUIVO DE AUDIO NAO ENCONTRADO:")
-        print(caminhoCompleto)
+        print("ARQUIVO DE AUDIO NAO ENCONTRADO.")
         print()
-        print("REMOVA O REGISTRO ANTIGO E")
-        print("CADASTRE A MUSICA NOVAMENTE.")
+        print("CAMINHO:")
+        print(caminhoCompleto)
         print()
 
         return
@@ -157,97 +508,52 @@ def tocarMusica(idMusica):
     if not iniciarAudio():
         return
 
+    volumeInicial = 0.7
+
     try:
         pygame.mixer.music.load(
             str(caminhoCompleto)
+        )
+
+        pygame.mixer.music.set_volume(
+            volumeInicial
         )
 
         pygame.mixer.music.play()
 
     except pygame.error as erro:
         print()
-        print("NAO FOI POSSIVEL REPRODUZIR")
-        print("A MUSICA.")
+        print("NAO FOI POSSIVEL TOCAR A MUSICA.")
         print("ERRO:", erro)
         print()
 
         return
 
-    inicio = time.time()
-    tempoPausado = 0
-    inicioPausa = 0
-    pausada = False
-
-    while True:
-        if pausada:
-            tempoAtual = (
-                inicioPausa
-                - inicio
-                - tempoPausado
-            )
-
-        else:
-            tempoAtual = (
-                time.time()
-                - inicio
-                - tempoPausado
-            )
-
-        if tempoAtual < 0:
-            tempoAtual = 0
-
-        if duracao > 0 and tempoAtual > duracao:
-            tempoAtual = duracao
-
-        mostrarTela(
+    try:
+        curses.wrapper(
+            executarPlayer,
             musica,
-            tempoAtual,
-            pausada
+            volumeInicial
         )
 
-        if (
-            not pygame.mixer.music.get_busy()
-            and not pausada
-        ):
-            break
+    except KeyboardInterrupt:
+        pygame.mixer.music.stop()
 
-        comando = input(
-            "PLAYER > "
-        ).strip().lower()
+    except curses.error as erro:
+        pygame.mixer.music.stop()
 
-        if comando == "p":
-            if pausada:
-                pygame.mixer.music.unpause()
+        print()
+        print("ERRO AO ABRIR A INTERFACE DO PLAYER.")
+        print("ERRO:", erro)
+        print()
+        print("EXECUTE O PROGRAMA EM UM TERMINAL REAL.")
+        print()
 
-                tempoPausado += (
-                    time.time()
-                    - inicioPausa
-                )
+        return
 
-                pausada = False
-
-            else:
-                pygame.mixer.music.pause()
-
-                inicioPausa = time.time()
-                pausada = True
-
-        elif comando == "s":
-            pygame.mixer.music.stop()
-            break
-
-        elif comando == "q":
-            pygame.mixer.music.stop()
-            break
-
-        elif comando == "":
-            continue
-
-        else:
-            print()
-            print("COMANDO DO PLAYER INVALIDO.")
-            time.sleep(1)
+    finally:
+        pygame.mixer.music.stop()
 
     print()
-    print("PLAYER ENCERRADO.")
+    print("REPRODUCAO ENCERRADA.")
     print()
