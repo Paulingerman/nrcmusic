@@ -1,7 +1,9 @@
 import re
-import time
 import subprocess
+import time
 from pathlib import Path
+
+from mutagen import File
 
 from banco import atualizarDuracao
 from banco import cadastrarMusica
@@ -10,6 +12,7 @@ from banco import listarMusicas
 
 PASTA_PROJETO = Path(__file__).resolve().parent.parent
 PASTA_MUSICAS = PASTA_PROJETO / "musicas"
+
 EXTENSOES_AUDIO = [
     ".mp3",
     ".wav",
@@ -44,7 +47,9 @@ def mostrarCarregamento():
     for posicao in range(tamanho + 1):
         preenchido = "█" * posicao
         vazio = "░" * (tamanho - posicao)
-        porcentagem = int((posicao / tamanho) * 100)
+        porcentagem = int(
+            (posicao / tamanho) * 100
+        )
 
         print(
             f"\r[{preenchido}{vazio}] {porcentagem}%",
@@ -135,6 +140,7 @@ def limparTitulo(titulo):
         r"\[lyrics\]",
         r"kissvk\.com",
         r"www\."
+        r"-corrigido$",
     ]
 
     tituloLimpo = titulo
@@ -159,7 +165,9 @@ def limparTitulo(titulo):
 
 
 def separarNome(nomeArquivo):
-    nomeSemExtensao = Path(nomeArquivo).stem
+    nomeSemExtensao = Path(
+        nomeArquivo
+    ).stem
 
     if " - " in nomeSemExtensao:
         partes = nomeSemExtensao.split(
@@ -180,7 +188,9 @@ def separarNome(nomeArquivo):
         )
 
     artista = partes[0].strip()
-    titulo = limparTitulo(partes[1].strip())
+    titulo = limparTitulo(
+        partes[1].strip()
+    )
 
     if not artista:
         artista = "DESCONHECIDO"
@@ -206,8 +216,91 @@ def criarCaminhoCompleto(caminho):
     return PASTA_PROJETO / caminhoRecebido
 
 
-def buscarDuracao(caminho):
-    caminhoCompleto = criarCaminhoCompleto(caminho)
+def obterPrimeiroValor(tags, chave):
+    if not tags:
+        return ""
+
+    valor = tags.get(chave)
+
+    if not valor:
+        return ""
+
+    if isinstance(valor, list):
+        valor = valor[0]
+
+    return str(valor).strip()
+
+
+def lerMetadados(caminho):
+    caminhoCompleto = criarCaminhoCompleto(
+        caminho
+    )
+
+    metadados = {
+        "titulo": "",
+        "artista": "",
+        "album": "",
+        "ano": "",
+        "duracao": 0
+    }
+
+    if not caminhoCompleto.is_file():
+        return metadados
+
+    try:
+        audio = File(
+            str(caminhoCompleto),
+            easy=True
+        )
+
+        if audio is None:
+            return metadados
+
+        metadados["titulo"] = obterPrimeiroValor(
+            audio.tags,
+            "title"
+        )
+
+        metadados["artista"] = obterPrimeiroValor(
+            audio.tags,
+            "artist"
+        )
+
+        metadados["album"] = obterPrimeiroValor(
+            audio.tags,
+            "album"
+        )
+
+        metadados["ano"] = obterPrimeiroValor(
+            audio.tags,
+            "date"
+        )
+
+        if (
+            audio.info is not None
+            and hasattr(audio.info, "length")
+            and audio.info.length
+        ):
+            metadados["duracao"] = round(
+                audio.info.length
+            )
+
+    except Exception as erro:
+        print()
+        print(
+            "AVISO: NAO FOI POSSIVEL LER "
+            "TODOS OS METADADOS."
+        )
+        print("DETALHES:", erro)
+        print()
+
+    return metadados
+
+
+def buscarDuracaoComFfprobe(caminho):
+    caminhoCompleto = criarCaminhoCompleto(
+        caminho
+    )
 
     try:
         resultado = subprocess.run(
@@ -268,6 +361,40 @@ def buscarDuracao(caminho):
         return 0
 
 
+def buscarDuracao(caminho):
+    metadados = lerMetadados(caminho)
+
+    duracao = metadados["duracao"]
+
+    if duracao > 0:
+        return duracao
+
+    return buscarDuracaoComFfprobe(caminho)
+
+
+def mostrarValor(valor):
+    if valor:
+        return valor
+
+    return "NAO INFORMADO"
+
+
+def solicitarCampo(nomeCampo, valorSugerido):
+    if valorSugerido:
+        valorDigitado = input(
+            f"{nomeCampo} [{valorSugerido}]: "
+        ).strip()
+
+        if valorDigitado:
+            return valorDigitado
+
+        return valorSugerido
+
+    return input(
+        f"{nomeCampo}: "
+    ).strip()
+
+
 def adicionarMusica():
     mostrarCarregamento()
 
@@ -284,7 +411,9 @@ def adicionarMusica():
 
     mostrarArquivos(arquivos)
 
-    arquivoEscolhido = escolherArquivo(arquivos)
+    arquivoEscolhido = escolherArquivo(
+        arquivos
+    )
 
     if arquivoEscolhido is None:
         print()
@@ -297,46 +426,143 @@ def adicionarMusica():
         arquivoEscolhido
     )
 
-    artistaSugerido, tituloSugerido = separarNome(
+    artistaArquivo, tituloArquivo = separarNome(
         arquivoEscolhido
     )
 
     print()
-    print("INFORMACOES SUGERIDAS")
+    print("LENDO METADADOS DO ARQUIVO...")
+
+    metadados = lerMetadados(caminho)
+
+    tituloSugerido = (
+        metadados["titulo"]
+        or tituloArquivo
+    )
+
+    artistaSugerido = (
+        metadados["artista"]
+        or artistaArquivo
+    )
+
+    albumSugerido = metadados["album"]
+    anoSugerido = metadados["ano"]
+    duracao = metadados["duracao"]
+
+    print()
+    print("INFORMACOES ENCONTRADAS")
     print("-" * 60)
-    print("TITULO  :", tituloSugerido)
-    print("ARTISTA :", artistaSugerido)
+    print(
+        "TITULO  :",
+        mostrarValor(tituloSugerido)
+    )
+    print(
+        "ARTISTA :",
+        mostrarValor(artistaSugerido)
+    )
+    print(
+        "ALBUM   :",
+        mostrarValor(albumSugerido)
+    )
+    print(
+        "ANO     :",
+        mostrarValor(anoSugerido)
+    )
+
+    if duracao > 0:
+        print(
+            "DURACAO :",
+            formatarDuracao(duracao)
+        )
+
+    else:
+        print("DURACAO : NAO IDENTIFICADA")
+
     print("-" * 60)
     print()
-    print("PRESSIONE ENTER PARA ACEITAR A SUGESTAO.")
+    print(
+        "PRESSIONE ENTER PARA ACEITAR "
+        "A INFORMACAO SUGERIDA."
+    )
     print()
 
-    titulo = input(
-        f"TITULO [{tituloSugerido}]: "
-    ).strip()
+    titulo = solicitarCampo(
+        "TITULO",
+        tituloSugerido
+    )
+
+    artista = solicitarCampo(
+        "ARTISTA",
+        artistaSugerido
+    )
+
+    album = solicitarCampo(
+        "ALBUM",
+        albumSugerido
+    )
 
     if not titulo:
-        titulo = tituloSugerido
+        print()
+        print("O TITULO NAO PODE FICAR VAZIO.")
+        print("CADASTRO CANCELADO.")
+        print()
 
-    artista = input(
-        f"ARTISTA [{artistaSugerido}]: "
-    ).strip()
+        return
 
     if not artista:
-        artista = artistaSugerido
+        artista = "DESCONHECIDO"
 
-    album = input("ALBUM: ").strip()
+    if duracao <= 0:
+        print()
+        print("ANALISANDO DURACAO DO ARQUIVO...")
 
-    print()
-    print("ANALISANDO DURACAO DO ARQUIVO...")
-
-    duracao = buscarDuracao(caminho)
+        duracao = buscarDuracaoComFfprobe(
+            caminho
+        )
 
     if duracao <= 0:
         print()
         print("NAO FOI POSSIVEL IDENTIFICAR")
         print("A DURACAO DA MUSICA.")
         print("A MUSICA NAO FOI CADASTRADA.")
+        print()
+
+        return
+
+    print()
+    print("RESUMO DO CADASTRO")
+    print("-" * 60)
+    print("TITULO  :", titulo)
+    print("ARTISTA :", artista)
+    print(
+        "ALBUM   :",
+        mostrarValor(album)
+    )
+    print(
+        "ANO     :",
+        mostrarValor(anoSugerido)
+    )
+    print(
+        "TEMPO   :",
+        formatarDuracao(duracao)
+    )
+    print(
+        "ARQUIVO :",
+        caminho
+    )
+    print("-" * 60)
+    print()
+
+    confirmacao = input(
+        "CONFIRMAR CADASTRO? [S/N]: "
+    ).strip().lower()
+
+    if confirmacao not in [
+        "s",
+        "sim"
+    ]:
+        print()
+        print("CADASTRO CANCELADO.")
         print()
 
         return
@@ -356,11 +582,14 @@ def adicionarMusica():
     print("MUSICA CADASTRADA COM SUCESSO.")
     print("TITULO  :", titulo)
     print("ARTISTA :", artista)
-
-    if album:
-        print("ALBUM   :", album)
-
-    print("TEMPO   :", formatarDuracao(duracao))
+    print(
+        "ALBUM   :",
+        mostrarValor(album)
+    )
+    print(
+        "TEMPO   :",
+        formatarDuracao(duracao)
+    )
     print()
 
 
@@ -394,14 +623,14 @@ def abrirBiblioteca():
         print("ID      :", idMusica)
         print("TITULO  :", titulo)
         print("ARTISTA :", artista)
-
-        if album:
-            print("ALBUM   :", album)
-
-        else:
-            print("ALBUM   : NAO INFORMADO")
-
-        print("TEMPO   :", formatarDuracao(duracao))
+        print(
+            "ALBUM   :",
+            mostrarValor(album)
+        )
+        print(
+            "TEMPO   :",
+            formatarDuracao(duracao)
+        )
 
         if not caminhoCompleto.is_file():
             print("ARQUIVO : NAO ENCONTRADO")
@@ -442,7 +671,9 @@ def atualizarBiblioteca():
         print(f"ANALISANDO: {titulo}")
 
         if not caminhoCompleto.is_file():
-            print("RESULTADO : ARQUIVO NAO ENCONTRADO")
+            print(
+                "RESULTADO : ARQUIVO NAO ENCONTRADO"
+            )
             print()
 
             naoEncontradas += 1
@@ -451,7 +682,9 @@ def atualizarBiblioteca():
         duracao = buscarDuracao(caminho)
 
         if duracao <= 0:
-            print("RESULTADO : ERRO AO LER DURACAO")
+            print(
+                "RESULTADO : ERRO AO LER DURACAO"
+            )
             print()
 
             erros += 1
@@ -471,7 +704,16 @@ def atualizarBiblioteca():
         atualizadas += 1
 
     print("-" * 60)
-    print("ATUALIZADAS      :", atualizadas)
-    print("NAO ENCONTRADAS :", naoEncontradas)
-    print("ERROS            :", erros)
+    print(
+        "ATUALIZADAS      :",
+        atualizadas
+    )
+    print(
+        "NAO ENCONTRADAS :",
+        naoEncontradas
+    )
+    print(
+        "ERROS            :",
+        erros
+    )
     print()

@@ -8,11 +8,26 @@ CAMINHO_BANCO = PASTA_DADOS / "musicas.db"
 
 
 def conectarBanco():
-    PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+    PASTA_DADOS.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    conexao = sqlite3.connect(CAMINHO_BANCO)
+    return sqlite3.connect(CAMINHO_BANCO)
 
-    return conexao
+
+def colunaExiste(cursor, nomeColuna):
+    cursor.execute(
+        "PRAGMA table_info(musicas)"
+    )
+
+    colunas = cursor.fetchall()
+
+    for coluna in colunas:
+        if coluna[1] == nomeColuna:
+            return True
+
+    return False
 
 
 def criarBanco():
@@ -26,11 +41,20 @@ def criarBanco():
             titulo TEXT NOT NULL,
             artista TEXT NOT NULL,
             album TEXT,
+            ano TEXT,
             caminho TEXT NOT NULL,
             duracao INTEGER NOT NULL DEFAULT 0
         )
         """
     )
+
+    if not colunaExiste(cursor, "ano"):
+        cursor.execute(
+            """
+            ALTER TABLE musicas
+            ADD COLUMN ano TEXT
+            """
+        )
 
     try:
         cursor.execute(
@@ -43,8 +67,13 @@ def criarBanco():
 
     except sqlite3.IntegrityError:
         print()
-        print("AVISO: EXISTEM CAMINHOS DUPLICADOS NO BANCO.")
-        print("O INDICE DE CAMINHO NAO FOI CRIADO.")
+        print(
+            "AVISO: EXISTEM CAMINHOS DUPLICADOS "
+            "NO BANCO."
+        )
+        print(
+            "O INDICE DE CAMINHO NAO FOI CRIADO."
+        )
         print()
 
     conexao.commit()
@@ -55,6 +84,7 @@ def cadastrarMusica(
     titulo,
     artista,
     album,
+    ano,
     caminho,
     duracao
 ):
@@ -68,15 +98,17 @@ def cadastrarMusica(
                 titulo,
                 artista,
                 album,
+                ano,
                 caminho,
                 duracao
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 titulo,
                 artista,
                 album,
+                ano,
                 caminho,
                 duracao
             )
@@ -104,7 +136,14 @@ def listarMusicas():
 
     cursor.execute(
         """
-        SELECT id, titulo, artista, album, caminho, duracao
+        SELECT
+            id,
+            titulo,
+            artista,
+            album,
+            ano,
+            caminho,
+            duracao
         FROM musicas
         ORDER BY artista, titulo
         """
@@ -123,7 +162,14 @@ def buscarMusica(idMusica):
 
     cursor.execute(
         """
-        SELECT id, titulo, artista, album, caminho, duracao
+        SELECT
+            id,
+            titulo,
+            artista,
+            album,
+            ano,
+            caminho,
+            duracao
         FROM musicas
         WHERE id = ?
         """,

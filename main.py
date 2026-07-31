@@ -1,4 +1,5 @@
 from banco import criarBanco
+from banco import removerMusica
 
 from sistema import desligarSistema
 from sistema import iniciarSistema
@@ -57,12 +58,6 @@ def executarComando(comando):
 
         tocarMusica(idMusica)
 
-    elif comando == "music":
-        print()
-        print("USE PLAY SEGUIDO DO ID DA MUSICA.")
-        print("EXEMPLO: play 1")
-        print()
-
     elif comando == "scan":
         atualizarBiblioteca()
 
@@ -72,9 +67,56 @@ def executarComando(comando):
         )
 
     elif comando == "remove":
-        programaIndisponivel(
-            "REMOVER MUSICA"
-        )
+        print()
+        print("INFORME O ID DA MUSICA.")
+        print("EXEMPLO: remove 3")
+        print()
+
+    elif comando.startswith("remove "):
+        partes = comando.split()
+
+        if len(partes) != 2:
+            print()
+            print("USO CORRETO: remove ID")
+            print("EXEMPLO: remove 3")
+            print()
+
+            return True
+
+        if not partes[1].isdigit():
+            print()
+            print("O ID DA MUSICA DEVE SER UM NUMERO.")
+            print("EXEMPLO: remove 3")
+            print()
+
+            return True
+
+        idMusica = int(partes[1])
+
+        print()
+        confirmacao = input(
+            f"TEM CERTEZA QUE DESEJA REMOVER "
+            f"A MUSICA DE ID {idMusica}? [S/N]: "
+        ).strip().lower()
+
+        if confirmacao not in ["s", "sim"]:
+            print()
+            print("REMOCAO CANCELADA.")
+            print()
+
+            return True
+
+        removida = removerMusica(idMusica)
+
+        print()
+
+        if removida:
+            print("MUSICA REMOVIDA COM SUCESSO.")
+
+        else:
+            print("MUSICA NAO ENCONTRADA.")
+
+        print()
 
     elif comando in ["clear", "cls"]:
         limparTela()
