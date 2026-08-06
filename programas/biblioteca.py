@@ -446,7 +446,10 @@ def adicionarMusica():
     )
 
     albumSugerido = metadados["album"]
-    anoSugerido = metadados["ano"]
+    ano = solicitarCampo(
+    "ANO",
+    anoSugerido
+    )
     duracao = metadados["duracao"]
 
     print()
@@ -613,8 +616,9 @@ def abrirBiblioteca():
         titulo = musica[1]
         artista = musica[2]
         album = musica[3]
-        caminho = musica[4]
-        duracao = musica[5]
+        ano = musica[4]
+        caminho = musica[5]
+        duracao = musica[6]
 
         caminhoCompleto = criarCaminhoCompleto(
             caminho
@@ -623,14 +627,9 @@ def abrirBiblioteca():
         print("ID      :", idMusica)
         print("TITULO  :", titulo)
         print("ARTISTA :", artista)
-        print(
-            "ALBUM   :",
-            mostrarValor(album)
-        )
-        print(
-            "TEMPO   :",
-            formatarDuracao(duracao)
-        )
+        print("ALBUM   :", mostrarValor(album))
+        print("ANO     :", mostrarValor(ano))
+        print("TEMPO   :", formatarDuracao(duracao))
 
         if not caminhoCompleto.is_file():
             print("ARQUIVO : NAO ENCONTRADO")
@@ -662,7 +661,7 @@ def atualizarBiblioteca():
     for musica in musicas:
         idMusica = musica[0]
         titulo = musica[1]
-        caminho = musica[4]
+        caminho = musica[5]
 
         caminhoCompleto = criarCaminhoCompleto(
             caminho

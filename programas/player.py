@@ -246,7 +246,7 @@ def desenharPlayer(
     else:
         album = "NAO INFORMADO"
 
-    duracao = musica[5]
+    duracao = musica[6]
 
     barraProgresso = criarBarraProgresso(
         tempoAtual,
@@ -389,7 +389,7 @@ def executarPlayer(
     inicioMusica = time.monotonic()
     playerAberto = True
 
-    duracao = musica[5]
+    duracao = musica[6]
 
     while playerAberto:
         tempoAtual = calcularTempoAtual(
@@ -489,7 +489,7 @@ def tocarMusica(idMusica):
 
         return
 
-    caminhoSalvo = musica[4]
+    caminhoSalvo = musica[5]
 
     caminhoCompleto = criarCaminhoCompleto(
         caminhoSalvo
