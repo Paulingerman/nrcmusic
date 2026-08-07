@@ -11,7 +11,12 @@ from sistema import programaIndisponivel
 from programas.biblioteca import adicionarMusica
 from programas.biblioteca import abrirBiblioteca
 from programas.biblioteca import atualizarBiblioteca
+
 from programas.player import tocarMusica
+
+from programas.spotifyupdate import (
+    atualizarComSpotify
+)
 
 
 def executarComando(comando):
@@ -23,7 +28,10 @@ def executarComando(comando):
     if comando == "help":
         mostrarAjuda()
 
-    elif comando in ["library", "ls"]:
+    elif comando in [
+        "library",
+        "ls"
+    ]:
         abrirBiblioteca()
 
     elif comando == "add":
@@ -31,32 +39,51 @@ def executarComando(comando):
 
     elif comando == "play":
         print()
-        print("INFORME O ID DA MUSICA.")
-        print("EXEMPLO: play 1")
+        print(
+            "INFORME O ID DA MUSICA."
+        )
+        print(
+            "EXEMPLO: play 1"
+        )
         print()
 
-    elif comando.startswith("play "):
+    elif comando.startswith(
+        "play "
+    ):
         partes = comando.split()
 
         if len(partes) != 2:
             print()
-            print("USO CORRETO: play ID")
-            print("EXEMPLO: play 1")
+            print(
+                "USO CORRETO: play ID"
+            )
+            print(
+                "EXEMPLO: play 1"
+            )
             print()
 
             return True
 
         if not partes[1].isdigit():
             print()
-            print("O ID DA MUSICA DEVE SER UM NUMERO.")
-            print("EXEMPLO: play 1")
+            print(
+                "O ID DA MUSICA "
+                "DEVE SER UM NUMERO."
+            )
+            print(
+                "EXEMPLO: play 1"
+            )
             print()
 
             return True
 
-        idMusica = int(partes[1])
+        idMusica = int(
+            partes[1]
+        )
 
-        tocarMusica(idMusica)
+        tocarMusica(
+            idMusica
+        )
 
     elif comando == "scan":
         atualizarBiblioteca()
@@ -68,63 +95,128 @@ def executarComando(comando):
 
     elif comando == "remove":
         print()
-        print("INFORME O ID DA MUSICA.")
-        print("EXEMPLO: remove 3")
+        print(
+            "INFORME O ID DA MUSICA."
+        )
+        print(
+            "EXEMPLO: remove 3"
+        )
         print()
 
-    elif comando.startswith("remove "):
+    elif comando.startswith(
+        "remove "
+    ):
         partes = comando.split()
 
         if len(partes) != 2:
             print()
-            print("USO CORRETO: remove ID")
-            print("EXEMPLO: remove 3")
+            print(
+                "USO CORRETO: remove ID"
+            )
+            print(
+                "EXEMPLO: remove 3"
+            )
             print()
 
             return True
 
         if not partes[1].isdigit():
             print()
-            print("O ID DA MUSICA DEVE SER UM NUMERO.")
-            print("EXEMPLO: remove 3")
+            print(
+                "O ID DA MUSICA "
+                "DEVE SER UM NUMERO."
+            )
             print()
 
             return True
 
-        idMusica = int(partes[1])
+        idMusica = int(
+            partes[1]
+        )
 
         print()
+
         confirmacao = input(
-            f"TEM CERTEZA QUE DESEJA REMOVER "
-            f"A MUSICA DE ID {idMusica}? [S/N]: "
+            (
+                "TEM CERTEZA QUE DESEJA "
+                "REMOVER A MUSICA DE ID "
+                f"{idMusica}? [S/N]: "
+            )
         ).strip().lower()
 
-        if confirmacao not in ["s", "sim"]:
+        if confirmacao not in [
+            "s",
+            "sim"
+        ]:
             print()
-            print("REMOCAO CANCELADA.")
+            print(
+                "REMOCAO CANCELADA."
+            )
             print()
 
             return True
 
-        removida = removerMusica(idMusica)
+        removida = removerMusica(
+            idMusica
+        )
 
         print()
 
         if removida:
-            print("MUSICA REMOVIDA COM SUCESSO.")
+            print(
+                "MUSICA REMOVIDA "
+                "COM SUCESSO."
+            )
 
         else:
-            print("MUSICA NAO ENCONTRADA.")
+            print(
+                "MUSICA NAO ENCONTRADA."
+            )
 
         print()
 
-    elif comando in ["clear", "cls"]:
+    elif comando == "spotify":
+        print()
+        print(
+            "COMANDOS DO SPOTIFY"
+        )
+        print("-" * 60)
+        print(
+            "spotify update"
+        )
+        print("-" * 60)
+        print()
+
+    elif comando == "spotify update":
+        atualizarComSpotify()
+
+    elif comando.startswith(
+        "spotify "
+    ):
+        print()
+        print(
+            "COMANDO DO SPOTIFY "
+            "NAO RECONHECIDO."
+        )
+        print()
+        print(
+            "USE: spotify update"
+        )
+        print()
+
+    elif comando in [
+        "clear",
+        "cls"
+    ]:
         limparTela()
 
     elif comando == "about":
         mostrarSobre()
 
-    elif comando in ["shutdown", "exit"]:
+    elif comando in [
+        "shutdown",
+        "exit"
+    ]:
         desligarSistema()
 
         return False
@@ -135,7 +227,10 @@ def executarComando(comando):
             "COMANDO NAO RECONHECIDO:",
             comando
         )
-        print("DIGITE HELP PARA VER OS COMANDOS.")
+        print(
+            "DIGITE HELP PARA VER "
+            "OS COMANDOS."
+        )
         print()
 
     return True
@@ -146,18 +241,22 @@ def abrirTerminal():
 
     while sistemaLigado:
         try:
-            comando = input("music@nrc > ")
+            comando = input(
+                "music@nrc > "
+            )
 
-            sistemaLigado = executarComando(
-                comando
+            sistemaLigado = (
+                executarComando(
+                    comando
+                )
             )
 
         except KeyboardInterrupt:
             print()
             print()
             print(
-                "USE SHUTDOWN PARA DESLIGAR "
-                "O SISTEMA."
+                "USE SHUTDOWN PARA "
+                "DESLIGAR O SISTEMA."
             )
             print()
 
@@ -165,6 +264,7 @@ def abrirTerminal():
             print()
 
             desligarSistema()
+
             sistemaLigado = False
 
 

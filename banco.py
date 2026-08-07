@@ -13,7 +13,11 @@ def conectarBanco():
         exist_ok=True
     )
 
-    return sqlite3.connect(CAMINHO_BANCO)
+    conexao = sqlite3.connect(
+        CAMINHO_BANCO
+    )
+
+    return conexao
 
 
 def colunaExiste(cursor, nomeColuna):
@@ -43,16 +47,31 @@ def criarBanco():
             album TEXT,
             ano TEXT,
             caminho TEXT NOT NULL,
-            duracao INTEGER NOT NULL DEFAULT 0
+            duracao INTEGER NOT NULL DEFAULT 0,
+            faixa INTEGER
         )
         """
     )
 
-    if not colunaExiste(cursor, "ano"):
+    if not colunaExiste(
+        cursor,
+        "ano"
+    ):
         cursor.execute(
             """
             ALTER TABLE musicas
             ADD COLUMN ano TEXT
+            """
+        )
+
+    if not colunaExiste(
+        cursor,
+        "faixa"
+    ):
+        cursor.execute(
+            """
+            ALTER TABLE musicas
+            ADD COLUMN faixa INTEGER
             """
         )
 
@@ -68,11 +87,12 @@ def criarBanco():
     except sqlite3.IntegrityError:
         print()
         print(
-            "AVISO: EXISTEM CAMINHOS DUPLICADOS "
-            "NO BANCO."
+            "AVISO: EXISTEM CAMINHOS "
+            "DUPLICADOS NO BANCO."
         )
         print(
-            "O INDICE DE CAMINHO NAO FOI CRIADO."
+            "O INDICE DE CAMINHO "
+            "NAO FOI CRIADO."
         )
         print()
 
@@ -86,7 +106,8 @@ def cadastrarMusica(
     album,
     ano,
     caminho,
-    duracao
+    duracao,
+    faixa=None
 ):
     conexao = conectarBanco()
     cursor = conexao.cursor()
@@ -100,9 +121,10 @@ def cadastrarMusica(
                 album,
                 ano,
                 caminho,
-                duracao
+                duracao,
+                faixa
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 titulo,
@@ -110,7 +132,8 @@ def cadastrarMusica(
                 album,
                 ano,
                 caminho,
-                duracao
+                duracao,
+                faixa
             )
         )
 
@@ -118,7 +141,9 @@ def cadastrarMusica(
 
     except sqlite3.IntegrityError:
         print()
-        print("ESSA MUSICA JA ESTA CADASTRADA.")
+        print(
+            "ESSA MUSICA JA ESTA CADASTRADA."
+        )
         print()
 
         conexao.close()
@@ -143,7 +168,8 @@ def listarMusicas():
             album,
             ano,
             caminho,
-            duracao
+            duracao,
+            faixa
         FROM musicas
         ORDER BY artista, titulo
         """
@@ -169,7 +195,8 @@ def buscarMusica(idMusica):
             album,
             ano,
             caminho,
-            duracao
+            duracao,
+            faixa
         FROM musicas
         WHERE id = ?
         """,
@@ -183,7 +210,10 @@ def buscarMusica(idMusica):
     return musica
 
 
-def atualizarDuracao(idMusica, duracao):
+def atualizarDuracao(
+    idMusica,
+    duracao
+):
     conexao = conectarBanco()
     cursor = conexao.cursor()
 
@@ -203,7 +233,10 @@ def atualizarDuracao(idMusica, duracao):
     conexao.close()
 
 
-def atualizarCaminho(idMusica, caminho):
+def atualizarCaminho(
+    idMusica,
+    caminho
+):
     conexao = conectarBanco()
     cursor = conexao.cursor()
 
@@ -232,6 +265,84 @@ def atualizarCaminho(idMusica, caminho):
     return True
 
 
+def atualizarDadosSpotify(
+    idMusica,
+    album,
+    ano,
+    faixa
+):
+    conexao = conectarBanco()
+    cursor = conexao.cursor()
+
+    cursor.execute(
+        """
+        UPDATE musicas
+        SET
+            album = ?,
+            ano = ?,
+            faixa = ?
+        WHERE id = ?
+        """,
+        (
+            album,
+            ano,
+            faixa,
+            idMusica
+        )
+    )
+
+    atualizada = (
+        cursor.rowcount > 0
+    )
+
+    conexao.commit()
+    conexao.close()
+
+    return atualizada
+
+
+def atualizarMusicaSpotify(
+    idMusica,
+    titulo,
+    artista,
+    album,
+    ano,
+    faixa
+):
+    conexao = conectarBanco()
+    cursor = conexao.cursor()
+
+    cursor.execute(
+        """
+        UPDATE musicas
+        SET
+            titulo = ?,
+            artista = ?,
+            album = ?,
+            ano = ?,
+            faixa = ?
+        WHERE id = ?
+        """,
+        (
+            titulo,
+            artista,
+            album,
+            ano,
+            faixa,
+            idMusica
+        )
+    )
+
+    atualizada = (
+        cursor.rowcount > 0
+    )
+
+    conexao.commit()
+    conexao.close()
+
+    return atualizada
+
+
 def removerMusica(idMusica):
     conexao = conectarBanco()
     cursor = conexao.cursor()
@@ -244,7 +355,9 @@ def removerMusica(idMusica):
         (idMusica,)
     )
 
-    removida = cursor.rowcount > 0
+    removida = (
+        cursor.rowcount > 0
+    )
 
     conexao.commit()
     conexao.close()
